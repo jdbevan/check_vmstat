@@ -1,0 +1,208 @@
+#!/bin/bash
+
+#   This program is free software; you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation; either version 2 of the License, or
+#   (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with this program; if not, write to the Free Software
+#   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+
+PROGNAME=`basename $0`
+VERSION="Version 0.1"
+AUTHOR="2012, Jon Bevan (https://github.com/jdbevan)"
+
+print_version() {
+    echo "$VERSION, $AUTHOR"
+}
+
+print_help() {
+    print_version $PROGNAME $VERSION
+    echo ""
+    echo "Description:"
+    echo "$PROGNAME is a Nagios plugin to monitor the output of "
+    echo "vmstat(8) on a server. It returns a mean value based on a number"
+    echo "of updates for all the values provide by vmstat by default unless"
+    echo "specified otherwise using the arguments below."
+    echo ""
+    echo "Example calls:"
+    echo "./$PROGNAME -P -C -Y --delay 1 --count 20"
+    echo "./$PROGNAME -output memory,swap,io -d 3"
+    echo ""
+    echo "Options:"
+    echo "  -P|--procs)"
+    echo "    Display the procs figures."
+    echo "  -M|--memory)"
+    echo "    Display the memory figures."
+    echo "  -W|--swap)"
+    echo "    Display the swap figures."
+    echo "  -I|--io)"
+    echo "    Display the I/O figures."
+    echo "  -Y|--system)"
+    echo "    Display the system figures."
+    echo "  -C|--cpu)"
+    echo "    Display the cpu figures."
+    echo ""
+    echo "  -d|--delay)"
+    echo "    The delay in seconds between vmstat updates in seconds. If not "
+    echo "    provided then the figures returned are the averages since system"
+    echo "    boot."
+    echo "  -c|--count)"
+    echo "    The number of vmstat updates. Ignored if delay is not specified."
+    echo "    Default value is 5."
+    echo "  -o|--output)"
+    echo "    Comma separated string specifying the data output from: procs,"
+    echo "    memory, swap, io, system, cpu, all."
+    echo "    Overridden by options -P -M -W -I -Y and -C. Default: all."
+	echo ""
+	# Need flags for specifying critical levels...    
+    exit $ST_UK
+}
+
+ST_OK=0
+ST_WR=1
+ST_CR=2
+ST_UK=3
+
+# Array pointers for output
+PROCS_R=0
+PROCS_B=1
+MEMORY_SWPD=2
+MEMORY_FREE=3
+MEMORY_BUFF=4
+MEMORY_CACHE=5
+MEMORY_INACT=6
+MEMORY_ACTIVE=7
+SWAP_SI=8
+SWAP_SO=9
+IO_BI=10
+IO_BO=11
+SYSTEM_IN=12
+SYSTEM_CS=13
+CPU_US=14
+CPU_SY=15
+CPU_ID=16
+CPU_WA=17
+CPU_ST=18
+
+
+delay=""
+count=5
+output="all"
+values=""
+
+#if [ -z "$1" ]
+#then
+#	print_help
+#	exit $ST_UK
+#fi
+
+while test -n "$1"; do
+    case "$1" in
+        --help|-h)
+            print_help
+            exit $ST_UK
+            ;;
+        --version|-v)
+            print_version $PROGNAME $VERSION
+            exit $ST_UK
+            ;;
+        --delay|-d)
+            delay=$2
+            shift
+            ;;
+        --count|-c)
+            count=$2
+            shift
+            ;;
+        --output|-o)
+            output=$2
+            shift
+            ;;
+        --procs|-P)
+            output="procs,$output"
+            shift
+            ;;
+        --memory|-M)
+            output="memory,$output"
+            shift
+            ;;
+        --swap|-W)
+            output="swap,$output"
+            shift
+            ;;
+        --io|-I)
+            output="io,$output"
+            shift
+            ;;
+        --system|-Y)
+            output="system,$output"
+            shift
+            ;;
+        --cpu|-C)
+            output="cpu,$output"
+            shift
+            ;;
+        *)
+            echo "Unknown argument: $1"
+            print_help
+            exit $ST_UK
+            ;;
+    esac
+    shift
+done
+
+# check functions
+check_output_opts() {
+	exit $ST_UK
+}
+
+check_vmstat() {
+	exit $ST_UK
+}
+
+check_count_delay() {
+	if [ -z "$delay" ]
+	then
+		count=""
+	fi
+}
+
+# get functions
+get_values() {
+	# See link for splitting data into array
+	# http://stackoverflow.com/questions/10586153/bash-split-string-into-array
+	vmstat -n $delay $count | grep '^[0-9 ]\+$' | while read line
+	do
+		if [ -z "$values" ]
+		then
+			values="$line"
+			echo -e "$values"
+		else
+			values="$values\n$line"
+			echo -e "$line"
+		fi
+	done
+#	echo -e "$values"
+}
+
+parse_values() {
+	exit $ST_UK
+}
+
+make_human_output() {
+	exit $ST_OK
+}
+
+make_perfdata() {
+	exit $ST_UK
+}
+
+check_count_delay
+get_values
