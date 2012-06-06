@@ -15,7 +15,7 @@
 #   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 PROGNAME=`basename $0`
-VERSION="Version 0.1"
+VERSION="Version 0.2"
 AUTHOR="2012, Jon Bevan (https://github.com/jdbevan)"
 
 print_version() {
@@ -133,28 +133,8 @@ while test -n "$1"; do
     shift
 done
 
-# tools
-search_data_columns() {
-    local i=1;
-    for str in "${data_columns[@]}"
-    do
-        if [ "$str" = "$1" ]
-        then
-            echo $i
-            return
-        else
-            ((i++))
-        fi
-    done
-    echo "-1"
-}
-
 # check functions
-check_output_opts() {
-	exit $ST_UK
-}
-
-check_vmstat() {
+check_vmstat_exists() {
 	if ! command -v vmstat &>/dev/null
 	then
 		echo "Can't find vmstat(8)!"
@@ -164,7 +144,7 @@ check_vmstat() {
 	fi
 }
 
-check_count_delay() {
+check_count_delay_values() {
 	# If no delay specified
 	if [ -z "$delay" ]
 	then
@@ -294,10 +274,10 @@ print_output() {
 	echo "$HUMAN_OUT | $PERFDATA"
 	exit $RTNVAL
 }
-# Run the program!
 
-check_vmstat
-check_count_delay
+# Run the program!
+check_vmstat_exists
+check_count_delay_values
 get_values
 check_values
 make_human_output
