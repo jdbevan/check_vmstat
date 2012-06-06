@@ -233,6 +233,8 @@ make_perfdata() {
 check_count_delay
 get_values
 
+echo "-- Averages --"
+
 for pindex in "${!averages[@]}"
 do
 	echo -n "${averages[pindex]} "
