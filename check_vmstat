@@ -91,11 +91,15 @@ CPU_ID=16
 CPU_WA=17
 CPU_ST=18
 
+# Array to hold averages
+declare -a averages
 
 delay=""
 count=5
 output="all"
-values=""
+vmstat_lines_processed=0
+
+#values=""
 
 #if [ -z "$1" ]
 #then
@@ -180,14 +184,29 @@ get_values() {
 	# http://stackoverflow.com/questions/10586153/bash-split-string-into-array
 	vmstat -n $delay $count | grep '^[0-9 ]\+$' | while read line
 	do
-		if [ -z "$values" ]
-		then
-			values="$line"
-			echo -e "$values"
-		else
-			values="$values\n$line"
-			echo -e "$line"
-		fi
+	#	if [ -z "$values" ]
+	#	then
+	#		values="$line"
+	#		echo -e "$values"
+	#	else
+	#		values="$values\n$line"
+			echo "$line"
+	#	fi
+		
+	# Split string into array
+	# Increment lines_processed
+	# Loop through array and calculate continuous average to be
+	# stored in averages variable: 
+	# (current_val*(lines_processed-1))+new_data / lines_processed
+		
+		IFS=' '
+		read -a values <<< "$line"
+	
+		for index in "${!values[@]}"
+		do
+			echo "$index ${values[index]}"
+		done
+	
 	done
 #	echo -e "$values"
 }
