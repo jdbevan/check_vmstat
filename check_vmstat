@@ -178,6 +178,7 @@ get_values() {
 
 	# See link for alternative to piping vmstat into while loop
 	# http://stackoverflow.com/questions/124167/bash-variable-scope
+	# http://stackoverflow.com/questions/613572/capturing-multiple-line-output-to-a-bash-variable
 
 	vmstat=$(vmstat -n $delay $count)
 	
