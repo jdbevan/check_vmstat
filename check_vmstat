@@ -72,25 +72,8 @@ ST_CR=2
 ST_UK=3
 
 # Array keys for output
-PROCS_R=0
-PROCS_B=1
-MEMORY_SWPD=2
-MEMORY_FREE=3
-MEMORY_BUFF=4
-MEMORY_CACHE=5
-MEMORY_INACT=6
-MEMORY_ACTIVE=7
-SWAP_SI=8
-SWAP_SO=9
-IO_BI=10
-IO_BO=11
-SYSTEM_IN=12
-SYSTEM_CS=13
-CPU_US=14
-CPU_SY=15
-CPU_ID=16
-CPU_WA=17
-CPU_ST=18
+#MEMORY_INACT MEMORY_ACTIVE CPU_ST
+data_columns=(PROCS_R PROCS_B MEMORY_SWPD MEMORY_FREE MEMORY_BUFF MEMORY_CACHE SWAP_SI SWAP_SO IO_BI IO_BO SYSTEM_IN SYSTEM_CS CPU_US CPU_SY CPU_ID CPU_WA)
 
 # Array to hold averages
 declare -a averages
@@ -156,24 +139,63 @@ while test -n "$1"; do
     shift
 done
 
+# tools
+search_data_columns() {
+    local i=1;
+    for str in "${data_columns[@]}"
+    do
+        if [ "$str" = "$1" ]
+        then
+            echo $i
+            return
+        else
+            ((i++))
+        fi
+    done
+    echo "-1"
+}
+
 # check functions
 check_output_opts() {
 	exit $ST_UK
 }
 
 check_vmstat() {
-	if ! command -v vm23423stat &>/dev/null
+	if ! command -v vmstat &>/dev/null
 	then
 		echo "Can't find vmstat(8)!"
+#		echo "Try running: sudo apt-get install procps"
+#		echo "         or: sudo yum install procps"
 		exit $ST_UK
 	fi
 }
 
 check_count_delay() {
+	# If no delay specified
 	if [ -z "$delay" ]
 	then
 		count=""
+	# If delay < 1
+	elif [ "$delay" -lt "1" ]
+	then
+		echo "Please provide a positive delay!"
+		exit $ST_UK
+	# If delay given but no count
+	elif [ -z "$count" ]
+	then
+		echo "Please provide a count!"
+		exit $ST_UK
+	# If count specified
+	elif [ -n "$count" ]
+	then
+		# Check it's not < 1
+		if [ "$count" -lt "1" ]
+		then
+			echo "Please provide a positive count!"
+			exit $ST_UK
+		fi
 	fi
+	
 }
 
 # get functions
@@ -187,59 +209,98 @@ get_values() {
 	# And multi-line command output parsing
 	# http://mywiki.wooledge.org/BashFAQ/001
 
-#	vmstat=$(vmstat -n $delay $count)
-	
 	while read -r line; do
 		if [[ "$line" =~ ^[0-9\ ]+$ ]]
 		then
 
-		# Split string into array
-		# Increment lines_processed
-		# Loop through array and calculate continuous average to be
-		# stored in averages variable: 
-		# (current_val*(lines_processed-1))+new_data / lines_processed
-		
-		echo $line
+			# Split string into array
+			# Increment lines_processed
+			# Loop through array and calculate continuous average to be
+			# stored in averages variable: 
+			# (current_val*(lines_processed-1))+new_data / lines_processed
 
-		vmstat_lines_processed=$((vmstat_lines_processed+1))
-		IFS=' '
-		read -a values <<< "$line"
+			vmstat_lines_processed=$((vmstat_lines_processed+1))
+			IFS=' '
+			read -a values <<< "$line"
 	
-		for index in "${!values[@]}"
-		do
-			if [ $vmstat_lines_processed -eq 1 ]
-			then
-				averages[${index}]=${values[index]}
-			else
-				cur_total=`echo "scale=2; ${averages[index]} * ($vmstat_lines_processed - 1) + ${values[index]}" | bc -l`
-				new_total=`echo "scale=2; $cur_total / $vmstat_lines_processed" | bc -l`
-				averages[${index}]=$new_total
-			fi
-		done
-		
+			for index in "${!values[@]}"
+			do
+				if [ $vmstat_lines_processed -eq 1 ]
+				then
+					averages[${index}]=${values[index]}
+				else
+					new_total=`echo "scale=2; (${averages[index]} * ($vmstat_lines_processed - 1) + ${values[index]}) / $vmstat_lines_processed" | bc -l`
+					averages[${index}]=$new_total
+				fi
+			done
 		fi
-	
 	done < <(vmstat -n $delay $count)
 
 }
 
 make_human_output() {
-	exit $ST_OK
+	HUMAN_OUT="OK -"
+	for pindex in "${!averages[@]}"
+	do
+		HUMAN_OUT="$HUMAN_OUT ${averages[pindex]} "
+	done
 }
 
 make_perfdata() {
-	exit $ST_UK
+	PERFDATA=""
+	
+	# Loop through possible columns	
+	for index in "${!data_columns[@]}"
+	do
+		case "${data_columns[index]}" in
+		    PROCS_R|PROCS_B)
+		    	if [[ "$output" == "all" || "$output" =~ "procs" ]] ; then
+					PERFDATA="${PERFDATA}${data_columns[index]}=${averages[index]} "
+		    	fi
+		        ;;
+		    MEMORY_SWPD|MEMORY_FREE|MEMORY_BUFF|MEMORY_CACHE)
+		    	if [[ "$output" == "all" || "$output" =~ "memory" ]] ; then
+					PERFDATA="${PERFDATA}${data_columns[index]}=${averages[index]} "
+		    	fi
+		        ;;
+		    SWAP_SI|SWAP_SO)
+		    	if [[ "$output" == "all" || "$output" =~ "swap" ]] ; then
+					PERFDATA="${PERFDATA}${data_columns[index]}=${averages[index]} "
+		    	fi
+		        ;;
+		    IO_BI|IO_BO)
+		    	if [[ "$output" == "all" || "$output" =~ "io" ]] ; then
+					PERFDATA="${PERFDATA}${data_columns[index]}=${averages[index]} "
+		    	fi
+		        ;;
+		    SYSTEM_IN|SYSTEM_CS)
+		    	if [[ "$output" == "all" || "$output" =~ "system" ]] ; then
+					PERFDATA="${PERFDATA}${data_columns[index]}=${averages[index]} "
+		    	fi
+		        ;;
+		    CPU_US|CPU_SY|CPU_ID|CPU_WA)
+		    	if [[ "$output" == "all" || "$output" =~ "cpu" ]] ; then
+					PERFDATA="${PERFDATA}${data_columns[index]}=${averages[index]} "
+		    	fi
+		        ;;
+		esac
+	done
 }
 
+check_values() {
+	RTNVAL=$ST_OK
+}
+
+print_output() {
+	echo "$HUMAN_OUT | $PERFDATA"
+	exit $RTNVAL
+}
 # Run the program!
 
 check_vmstat
 check_count_delay
 get_values
-
-echo "-- Averages --"
-
-for pindex in "${!averages[@]}"
-do
-	echo -n "${averages[pindex]} "
-done
+check_values
+make_human_output
+make_perfdata
+print_output
