@@ -80,7 +80,7 @@ declare -a averages
 
 delay=""
 count=5
-output="all"
+output=""
 vmstat_lines_processed=0
 
 # Process arguments
@@ -108,27 +108,21 @@ while test -n "$1"; do
             ;;
         --procs|-P)
             output="procs,$output"
-            shift
             ;;
         --memory|-M)
             output="memory,$output"
-            shift
             ;;
         --swap|-W)
             output="swap,$output"
-            shift
             ;;
         --io|-I)
             output="io,$output"
-            shift
             ;;
         --system|-Y)
             output="system,$output"
-            shift
             ;;
         --cpu|-C)
             output="cpu,$output"
-            shift
             ;;
         *)
             echo "Unknown argument: $1"
@@ -288,6 +282,11 @@ make_perfdata() {
 }
 
 check_values() {
+	if [ -z "$output" ]
+	then
+		output="all"
+	fi
+	echo $output
 	RTNVAL=$ST_OK
 }
 
