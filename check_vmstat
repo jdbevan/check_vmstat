@@ -178,14 +178,14 @@ get_values() {
 
 	# See link for alternative to piping vmstat into while loop
 	# http://stackoverflow.com/questions/124167/bash-variable-scope
-	# http://stackoverflow.com/questions/613572/capturing-multiple-line-output-to-a-bash-variable
-
-	vmstat=$(vmstat -n $delay $count)
 	
-	while read line
-	do
-	echo $line
-		if [[ "$line" =~ ^[0-9\s]+$ ]]
+	# And multi-line command output parsing
+	# http://mywiki.wooledge.org/BashFAQ/001
+
+#	vmstat=$(vmstat -n $delay $count)
+	
+	while read -r line; do
+		if [[ "$line" =~ ^[0-9\ ]+$ ]]
 		then
 
 		# Split string into array
@@ -214,7 +214,7 @@ get_values() {
 		
 		fi
 	
-	done <<< ${vmstat}
+	done < <(vmstat -n $delay $count)
 
 }
 
