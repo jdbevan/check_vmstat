@@ -65,12 +65,13 @@ print_help() {
     exit $ST_UK
 }
 
+# Exit status codes
 ST_OK=0
 ST_WR=1
 ST_CR=2
 ST_UK=3
 
-# Array pointers for output
+# Array keys for output
 PROCS_R=0
 PROCS_B=1
 MEMORY_SWPD=2
@@ -161,7 +162,11 @@ check_output_opts() {
 }
 
 check_vmstat() {
-	exit $ST_UK
+	if ! command -v vm23423stat &>/dev/null
+	then
+		echo "Can't find vmstat(8)!"
+		exit $ST_UK
+	fi
 }
 
 check_count_delay() {
@@ -218,10 +223,6 @@ get_values() {
 
 }
 
-parse_values() {
-	exit $ST_UK
-}
-
 make_human_output() {
 	exit $ST_OK
 }
@@ -230,6 +231,9 @@ make_perfdata() {
 	exit $ST_UK
 }
 
+# Run the program!
+
+check_vmstat
 check_count_delay
 get_values
 
