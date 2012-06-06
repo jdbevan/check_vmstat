@@ -99,14 +99,7 @@ count=5
 output="all"
 vmstat_lines_processed=0
 
-#values=""
-
-#if [ -z "$1" ]
-#then
-#	print_help
-#	exit $ST_UK
-#fi
-
+# Process arguments
 while test -n "$1"; do
     case "$1" in
         --help|-h)
@@ -182,33 +175,46 @@ check_count_delay() {
 get_values() {
 	# See link for splitting data into array
 	# http://stackoverflow.com/questions/10586153/bash-split-string-into-array
-	vmstat -n $delay $count | grep '^[0-9 ]\+$' | while read line
+
+	# See link for alternative to piping vmstat into while loop
+	# http://stackoverflow.com/questions/124167/bash-variable-scope
+
+	vmstat=$(vmstat -n $delay $count)
+	
+	while read line
 	do
-	#	if [ -z "$values" ]
-	#	then
-	#		values="$line"
-	#		echo -e "$values"
-	#	else
-	#		values="$values\n$line"
-			echo "$line"
-	#	fi
+	echo $line
+		if [[ "$line" =~ ^[0-9\s]+$ ]]
+		then
+
+		# Split string into array
+		# Increment lines_processed
+		# Loop through array and calculate continuous average to be
+		# stored in averages variable: 
+		# (current_val*(lines_processed-1))+new_data / lines_processed
 		
-	# Split string into array
-	# Increment lines_processed
-	# Loop through array and calculate continuous average to be
-	# stored in averages variable: 
-	# (current_val*(lines_processed-1))+new_data / lines_processed
-		
+		echo $line
+
+		vmstat_lines_processed=$((vmstat_lines_processed+1))
 		IFS=' '
 		read -a values <<< "$line"
 	
 		for index in "${!values[@]}"
 		do
-			echo "$index ${values[index]}"
+			if [ $vmstat_lines_processed -eq 1 ]
+			then
+				averages[${index}]=${values[index]}
+			else
+				cur_total=`echo "scale=2; ${averages[index]} * ($vmstat_lines_processed - 1) + ${values[index]}" | bc -l`
+				new_total=`echo "scale=2; $cur_total / $vmstat_lines_processed" | bc -l`
+				averages[${index}]=$new_total
+			fi
 		done
+		
+		fi
 	
-	done
-#	echo -e "$values"
+	done <<< ${vmstat}
+
 }
 
 parse_values() {
@@ -225,3 +231,8 @@ make_perfdata() {
 
 check_count_delay
 get_values
+
+for pindex in "${!averages[@]}"
+do
+	echo -n "${averages[pindex]} "
+done
