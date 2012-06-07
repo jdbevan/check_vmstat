@@ -213,10 +213,42 @@ get_values() {
 }
 
 make_human_output() {
-	HUMAN_OUT="OK -"
-	for pindex in "${!averages[@]}"
+	HUMAN_OUT="OK - Averages:"
+	#for index in "${!averages[@]}"
+	for index in "${!data_columns[@]}"
 	do
-		HUMAN_OUT="$HUMAN_OUT ${averages[pindex]} "
+		case "${data_columns[index]}" in
+		    PROCS_R|PROCS_B)
+		    	if [[ "$output" == "all" || "$output" =~ "procs" ]] ; then
+					HUMAN_OUT="${HUMAN_OUT} ${averages[index]}"
+		    	fi
+		        ;;
+		    MEMORY_SWPD|MEMORY_FREE|MEMORY_BUFF|MEMORY_CACHE)
+		    	if [[ "$output" == "all" || "$output" =~ "memory" ]] ; then
+					HUMAN_OUT="${HUMAN_OUT} ${averages[index]}b"
+		    	fi
+		        ;;
+		    SWAP_SI|SWAP_SO)
+		    	if [[ "$output" == "all" || "$output" =~ "swap" ]] ; then
+					HUMAN_OUT="${HUMAN_OUT} ${averages[index]}b/s"
+		    	fi
+		        ;;
+		    IO_BI|IO_BO)
+		    	if [[ "$output" == "all" || "$output" =~ "io" ]] ; then
+					HUMAN_OUT="${HUMAN_OUT} ${averages[index]}blocks/s"
+		    	fi
+		        ;;
+		    SYSTEM_IN|SYSTEM_CS)
+		    	if [[ "$output" == "all" || "$output" =~ "system" ]] ; then
+					HUMAN_OUT="${HUMAN_OUT} ${averages[index]}/s"
+		    	fi
+		        ;;
+		    CPU_US|CPU_SY|CPU_ID|CPU_WA)
+		    	if [[ "$output" == "all" || "$output" =~ "cpu" ]] ; then
+					HUMAN_OUT="${HUMAN_OUT} ${averages[index]}%"
+		    	fi
+		        ;;
+		esac
 	done
 }
 
