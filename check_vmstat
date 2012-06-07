@@ -33,7 +33,7 @@ print_help() {
     echo ""
     echo "Example calls:"
     echo "./$PROGNAME -P -C -Y --delay 1 --count 20"
-    echo "./$PROGNAME -output memory,swap,io -d 3"
+    echo "./$PROGNAME --output memory,swap,io -d 3"
     echo ""
     echo "Options:"
     echo "  -P|--procs)"
@@ -59,8 +59,8 @@ print_help() {
     echo "  -o|--output)"
     echo "    Comma separated string specifying the data output from: procs,"
     echo "    memory, swap, io, system, cpu, all."
-    echo "    Overridden by options -P -M -W -I -Y and -C. Default: all."
-	echo ""
+    echo "    Added to options -P -M -W -I -Y and -C. Default: all."
+    echo ""
 	# Need flags for specifying critical levels...    
     exit $ST_UK
 }
@@ -266,7 +266,6 @@ check_values() {
 	then
 		output="all"
 	fi
-	echo $output
 	RTNVAL=$ST_OK
 }
 
