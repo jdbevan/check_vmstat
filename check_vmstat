@@ -15,7 +15,7 @@
 #   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 PROGNAME=`basename $0`
-VERSION="Version 0.2"
+VERSION="Version 0.3"
 AUTHOR="2012, Jon Bevan (https://github.com/jdbevan)"
 
 print_version() {
@@ -27,27 +27,31 @@ print_help() {
     echo ""
     echo "Description:"
     echo "$PROGNAME is a Nagios plugin to monitor the output of "
-    echo "vmstat(8) on a server. It returns a mean value based on a number"
-    echo "of updates for all the values provide by vmstat by default unless"
-    echo "specified otherwise using the arguments below."
+    echo "vmstat(8) on a server. It returns a list of mean values for all"
+    echo "the metrics provided by vmstat based on a number of updates of"
+    echo "vmstat a restricted set of metrics are specified using the arguments"
+    echo "below. Warning and critical figures can be provided for each group"
+    echo "of metrics."
     echo ""
     echo "Example calls:"
     echo "./$PROGNAME -P -C -Y --delay 1 --count 20"
     echo "./$PROGNAME --output memory,swap,io -d 3"
+    echo "./$PROGNAME --cpu 50 80 -o cpu -d 1 -c 10"
     echo ""
     echo "Options:"
-    echo "  -P|--procs)"
+    echo "  -P|--procs [warning_value] [critical_value]"
     echo "    Display the procs figures."
-    echo "  -M|--memory)"
+    echo "  -M|--memory [warning_value] [critical_value]"
     echo "    Display the memory figures."
-    echo "  -W|--swap)"
+    echo "  -W|--swap [warning_value] [critical_value]"
     echo "    Display the swap figures."
-    echo "  -I|--io)"
+    echo "  -I|--io [warning_value] [critical_value]"
     echo "    Display the I/O figures."
-    echo "  -Y|--system)"
+    echo "  -Y|--system [warning_value] [critical_value]"
     echo "    Display the system figures."
-    echo "  -C|--cpu)"
-    echo "    Display the cpu figures."
+    echo "  -C|--cpu [warning_value] [critical_value]"
+    echo "    Display the cpu figures. Warning and critical values are not"
+    echo "    compared against the CPU idle value."
     echo ""
     echo "  -d|--delay)"
     echo "    The delay in seconds between vmstat updates in seconds. If not "
@@ -75,13 +79,40 @@ ST_UK=3
 #MEMORY_INACT MEMORY_ACTIVE CPU_ST
 data_columns=(PROCS_R PROCS_B MEMORY_SWPD MEMORY_FREE MEMORY_BUFF MEMORY_CACHE SWAP_SI SWAP_SO IO_BI IO_BO SYSTEM_IN SYSTEM_CS CPU_US CPU_SY CPU_ID CPU_WA)
 
+PROCS_WC=0
+MEMORY_WC=1
+SWAP_WC=2
+IO_WC=3
+SYSTEM_WC=4
+CPU_WC=5
+
 # Array to hold averages
 declare -a averages
+# Arrays to hold warning and critical values
+declare -a warnings
+declare -a criticals
 
+STATUS="OK"
 delay=""
 count=5
 output=""
 vmstat_lines_processed=0
+
+arg_shft=0
+
+# argument parsing functions
+store_warning_critical_values() {
+	arg_shft=0
+	if [[ $2 =~ ^[0-9.]+$ ]]; then
+		warnings[$1]=$2
+		arg_shft=1
+		if [[ $3 =~ ^[0-9.]+$ ]]; then
+			criticals[$1]=$3
+			arg_shft=2
+		fi
+	fi
+}
+
 
 # Process arguments
 while test -n "$1"; do
@@ -108,21 +139,33 @@ while test -n "$1"; do
             ;;
         --procs|-P)
             output="procs,$output"
+            store_warning_critical_values $PROCS_WC $2 $3
+            shift $arg_shft
             ;;
         --memory|-M)
             output="memory,$output"
+            store_warning_critical_values $MEMORY_WC $2 $3
+            shift $arg_shft
             ;;
         --swap|-W)
             output="swap,$output"
+            store_warning_critical_values $SWAP_WC $2 $3
+            shift $arg_shft
             ;;
         --io|-I)
             output="io,$output"
+            store_warning_critical_values $IO_WC $2 $3
+            shift $arg_shft
             ;;
         --system|-Y)
             output="system,$output"
+            store_warning_critical_values $SYSTEM_WC $2 $3
+            shift $arg_shft
             ;;
         --cpu|-C)
             output="cpu,$output"
+            store_warning_critical_values $CPU_WC $2 $3
+            shift $arg_shft
             ;;
         *)
             echo "Unknown argument: $1"
@@ -138,8 +181,6 @@ check_vmstat_exists() {
 	if ! command -v vmstat &>/dev/null
 	then
 		echo "Can't find vmstat(8)!"
-#		echo "Try running: sudo apt-get install procps"
-#		echo "         or: sudo yum install procps"
 		exit $ST_UK
 	fi
 }
@@ -212,44 +253,75 @@ get_values() {
 
 }
 
+set_status() {
+	# Floating point comparison from:
+	# http://stackoverflow.com/questions/2424770/floating-point-comparison-in-shell-script
+	
+	if [ "$STATUS" != "Critical" ]; then
+	
+		if [[ $(bc <<< "$1 >= $2") -eq 1 ]]; then
+			# Warning
+			if [ "$STATUS" == "OK" ]; then
+				STATUS="Warning"
+			fi
+		fi
+		
+		if [[ $(bc <<< "$1 >= $3") -eq 1 ]]; then
+			# Critical
+			if [ "$STATUS" == "Warning" ]; then
+				STATUS="Critical"
+			fi
+		fi
+	fi
+}
+
 make_human_output() {
-	HUMAN_OUT="OK - Averages:"
-	#for index in "${!averages[@]}"
+	HUMAN_OUT="Averages:"
 	for index in "${!data_columns[@]}"
 	do
 		case "${data_columns[index]}" in
 		    PROCS_R|PROCS_B)
 		    	if [[ "$output" == "all" || "$output" =~ "procs" ]] ; then
 					HUMAN_OUT="${HUMAN_OUT} ${averages[index]}"
+					set_status ${averages[index]} ${warnings[PROC_WC]} ${criticals[PROC_WC]}
 		    	fi
 		        ;;
 		    MEMORY_SWPD|MEMORY_FREE|MEMORY_BUFF|MEMORY_CACHE)
 		    	if [[ "$output" == "all" || "$output" =~ "memory" ]] ; then
 					HUMAN_OUT="${HUMAN_OUT} ${averages[index]}b"
+					set_status ${averages[index]} ${warnings[MEMORY_WC]} ${criticals[MEMORY_WC]}
 		    	fi
 		        ;;
 		    SWAP_SI|SWAP_SO)
 		    	if [[ "$output" == "all" || "$output" =~ "swap" ]] ; then
 					HUMAN_OUT="${HUMAN_OUT} ${averages[index]}b/s"
+					set_status ${averages[index]} ${warnings[SWAP_WC]} ${criticals[SWAP_WC]}
 		    	fi
 		        ;;
 		    IO_BI|IO_BO)
 		    	if [[ "$output" == "all" || "$output" =~ "io" ]] ; then
 					HUMAN_OUT="${HUMAN_OUT} ${averages[index]}blocks/s"
+					set_status ${averages[index]} ${warnings[IO_WC]} ${criticals[IO_WC]}
 		    	fi
 		        ;;
 		    SYSTEM_IN|SYSTEM_CS)
 		    	if [[ "$output" == "all" || "$output" =~ "system" ]] ; then
 					HUMAN_OUT="${HUMAN_OUT} ${averages[index]}/s"
+					set_status ${averages[index]} ${warnings[SYSTEM_WC]} ${criticals[SYSTEM_WC]}
 		    	fi
 		        ;;
 		    CPU_US|CPU_SY|CPU_ID|CPU_WA)
 		    	if [[ "$output" == "all" || "$output" =~ "cpu" ]] ; then
 					HUMAN_OUT="${HUMAN_OUT} ${averages[index]}%"
+					
+					if [ "${data_columns[index]}" != "CPU_ID" ]; then
+						set_status ${averages[index]} ${warnings[CPU_WC]} ${criticals[CPU_WC]}
+					fi
 		    	fi
 		        ;;
 		esac
 	done
+	HUMAN_OUT="$STATUS - $HUMAN_OUT"
 }
 
 make_perfdata() {
